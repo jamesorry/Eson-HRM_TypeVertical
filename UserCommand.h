@@ -54,7 +54,8 @@ void cmdMotorInitSpeed();
 void cmdPressTimes();
 void cmdMaxPressTimes();
 void cmdCylinderLimitDistance();
-
+void cmdSlopeFormula();
+void cmdCalibration_PWM_Count();
 
 
 #endif //_USER_COMMAND_H_

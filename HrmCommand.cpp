@@ -28,6 +28,7 @@ HRMCMD HRM_g_cmdFunc[] = {
     {"white_card_zero_offset", white_card_zero_offset},
     {"white_card_limit_depth", white_card_limit_depth},
     {"white_card_max_depth", white_card_max_depth},
+    {"white_card_cal", white_card_cal},
     {"?", HRMshowHelp}
 };
 
@@ -220,6 +221,51 @@ void white_card_max_depth()
     HRM_cmd_port->print("white_card_max_depth ");
     HRM_cmd_port->println(max_depth, 1);
 }
+
+void white_card_cal(void)
+{
+    //white_card_cal 1 0.1 0.1
+    String arg1, arg2, arg3;
+    int num;
+    float Std_distance, Act_distance;
+	if(!HRMgetNextArg(arg1))
+	{
+		return;
+	}
+    num = arg1.toInt();
+    if(!HRMgetNextArg(arg2))
+	{
+	    cmd_port->print("maindata cal ");
+        cmd_port->print(num);
+        cmd_port->print(": ");
+        cmd_port->print(maindata.Std_Act_Distance[num][0]);
+        cmd_port->print(", ");
+        cmd_port->println(maindata.Std_Act_Distance[num][1]);
+
+	    cmd_port->print("cal ");
+        cmd_port->print(num);
+        cmd_port->print(": ");
+        cmd_port->print((float)maindata.Std_Act_Distance[num][0]*0.001, 3);
+        cmd_port->print(", ");
+        cmd_port->println((float)maindata.Std_Act_Distance[num][1]*0.001, 3);
+		return;
+	}
+    if(!HRMgetNextArg(arg3))
+	{
+		return;
+	}
+    Std_distance = arg2.toFloat();
+    Act_distance = arg3.toFloat(); 
+    cmd_port->print("Std_distance: ");
+    cmd_port->println(Std_distance, 3);
+    cmd_port->print("Act_distance: ");
+    cmd_port->println(Act_distance, 3);
+    if(num >= 0 && num < 100){
+        maindata.Std_Act_Distance[num][0] = Std_distance*1000.0;
+        maindata.Std_Act_Distance[num][1] = Act_distance*1000.0;
+    }
+}
+
 
 String HRM_g_inputBuffer0 = "";
 String* HRM_g_inputBuffer = NULL;

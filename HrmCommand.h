@@ -24,6 +24,6 @@ void white_card_pos_set_offset();
 void white_card_zero_offset();
 void white_card_limit_depth();
 void white_card_max_depth();
-
+void white_card_cal(void);
 #endif //_HRM_COMMAND_H_
 

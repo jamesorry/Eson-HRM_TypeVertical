@@ -23,7 +23,10 @@ Uart command:
     Ex 限制高度為8mm，若目前高度在1mm，按下移進or移出，
     須強制馬達到達8mm才能繼續移進or移出，
     完成移進or移出後，在回到目前高度1mm
-
+2021/07/23
+1. motor position calibration
+2. 需增加指令填寫(white_card_cal 1 0.1 0.1)
+2. calibration後的數值需寫入EEPROM
 */
 
 #include "Arduino.h"

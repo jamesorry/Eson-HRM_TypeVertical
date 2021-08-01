@@ -53,7 +53,8 @@ CMD g_cmdFunc[] = {
     {"PressTimes", cmdPressTimes},
     {"MaxPressTimes", cmdMaxPressTimes},
     {"CylinderLimitDistance", cmdCylinderLimitDistance},
-    
+    {"SlopeFormula",cmdSlopeFormula},
+    {"cal_mm_pulse", cmdCalibration_PWM_Count},
 	{"?", showHelp}
 };
     
@@ -730,6 +731,7 @@ float       CylinderLimitDistance;  //移動氣壓缸機構限制深度
 
 #endif
 #if 1
+    READ_EEPROM();
     cmd_port->println("Vendor: " + String(maindata.Vendor));
     cmd_port->println("HMI_ID: " + String(maindata.HMI_ID));
     cmd_port->println("MotorAcceleration: " + String(maindata.MotorAcceleration));
@@ -742,6 +744,15 @@ float       CylinderLimitDistance;  //移動氣壓缸機構限制深度
     cmd_port->println("PressTimes: " + String(maindata.PressTimes));
     cmd_port->println("MaxPressTimes: " + String(maindata.MaxPressTimes));
     cmd_port->println("CylinderLimitDistance: " + String(maindata.CylinderLimitDistance));
+    for(int i=0; i<CALIBRATION_MAX_NUM; i++){
+        cmd_port->print(i);
+        cmd_port->print(": ");
+        for(int j=0; j<2; j++){
+            cmd_port->print(maindata.Std_Act_Distance[i][j]*0.01, 2);
+            cmd_port->print(", ");
+        }
+        cmd_port->println();
+    }
 #endif
 }
 
@@ -838,6 +849,90 @@ void cmdCylinderLimitDistance()
     runtimedata.UpdateEEPROM = true;
 }
 
+void cmdSlopeFormula()
+{
+    String arg1, arg2, arg3;
+    int num;
+    float Std_distance, Act_distance;
+	if(!getNextArg(arg1))
+	{
+		return;
+	}
+    num = arg1.toInt();
+    if(num >= 0 && num < CALIBRATION_MAX_NUM)
+    {
+        if(!getNextArg(arg2))
+    	{
+    	    cmd_port->print("maindata cal ");
+            cmd_port->print(num);
+            cmd_port->print(": ");
+            cmd_port->print(maindata.Std_Act_Distance[num][0]);
+            cmd_port->print(", ");
+            cmd_port->println(maindata.Std_Act_Distance[num][1]);
+
+    	    cmd_port->print("cal ");
+            cmd_port->print(num);
+            cmd_port->print(": ");
+            cmd_port->print((float)maindata.Std_Act_Distance[num][0]*0.001, 3);
+            cmd_port->print(", ");
+            cmd_port->println((float)maindata.Std_Act_Distance[num][1]*0.001, 3);
+    		return;
+    	}
+        if(!getNextArg(arg3))
+    	{
+    		return;
+    	}
+        Std_distance = arg2.toFloat();
+        Act_distance = arg3.toFloat();
+        cmd_port->print("Std_distance: ");
+        cmd_port->println(Std_distance, 3);
+        cmd_port->print("Act_distance: ");
+        cmd_port->println(Act_distance, 3);
+        maindata.Std_Act_Distance[num][0] = Std_distance*1000.0;
+        maindata.Std_Act_Distance[num][1] = Act_distance*1000.0;
+        cmd_port->print("maindata.Std_distance: ");
+        cmd_port->println(maindata.Std_Act_Distance[num][0]);
+        cmd_port->print("maindata.Act_distance: ");
+        cmd_port->println(maindata.Std_Act_Distance[num][1]);
+        SlopeCalculate_M_b(num);
+    }
+    else{
+        cmd_port->println("Calibration min num: " + String(0));
+        cmd_port->println("Calibration max num: " + String(CALIBRATION_MAX_NUM));
+        cmd_port->println(String(num) + " is error num.");
+    }
+}
+void cmdCalibration_PWM_Count()
+{
+    
+    String arg1;
+    float dipth_mm;
+    long pulse;
+    if(!getNextArg(arg1))
+    {
+        return;
+    }
+    dipth_mm = arg1.toFloat();
+    if(dipth_mm <= (float)maindata.MaxPressTimes*0.1 && dipth_mm >= 0)
+    {
+        pulse = Calibration_PWM_Count(dipth_mm);
+        cmd_port->print("dipth_mm: ");
+        cmd_port->print(dipth_mm, 1);
+        cmd_port->print("-->");
+        cmd_port->println("Cal pulse: " + String(pulse));
+    }
+    else
+    {
+        cmd_port->println("MaxPressTimes: " + String(maindata.MaxPressTimes));
+        cmd_port->println("Min Depth: 0");
+        cmd_port->print("Max Depth: ");
+        cmd_port->println((float)maindata.MaxPressTimes*0.1, 1);
+        cmd_port->print("Input value: ");
+        cmd_port->print(dipth_mm, 1);
+        cmd_port->println(" is error.");
+        return;
+    }
+}
 
 //-----------------------------------------------------------------------------------
 uint8_t UserCommWorkindex = 0;

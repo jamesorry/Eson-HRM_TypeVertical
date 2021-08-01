@@ -36,9 +36,9 @@ void reboot()
 void MainProcess_ReCheckEEPROMValue()
 {
     
-	if(maindata.ValueReInitMagicCode != 705)	//20210705
+	if(maindata.ValueReInitMagicCode != 728)	//20210705
 	{
-		maindata.ValueReInitMagicCode = 705;
+		maindata.ValueReInitMagicCode = 728;
 		runtimedata.UpdateEEPROM = true;
 	}
     if(maindata.HMI_ID < 0 || maindata.HMI_ID > 255)
@@ -95,6 +95,18 @@ void MainProcess_ReCheckEEPROMValue()
         maindata.CylinderLimitDistance = 8.0;
         runtimedata.UpdateEEPROM = true;
     }
+    for(int i=0; i<CALIBRATION_MAX_NUM; i++){
+        cmd_port->print(i);
+        cmd_port->print(": ");
+        for(int j=0; j<2; j++){
+            if(maindata.Std_Act_Distance[i][j]*0.001 > 100 || maindata.Std_Act_Distance[i][j]*0.001 < 0)
+                maindata.Std_Act_Distance[i][j] = 0;
+            cmd_port->print(maindata.Std_Act_Distance[i][j]*0.001, 2);
+            cmd_port->print(", ");
+        }
+        cmd_port->println();
+    }
+    runtimedata.UpdateEEPROM = true;
 }
 
 
@@ -168,6 +180,22 @@ void MainProcess_Init()
 	//maindata.PressTimes = 0;
     motor[MOTOR_LEFT] = new StepperMotor(MOTOR_LEFT_PULSE_PIN, A8, 1000, MOTOR_VELOCITY_NORMAL);
 	motor[0]->setLimitPin(InputPin[runtimedata.motorstate.MaxPin], LOW, InputPin[runtimedata.motorstate.HomePin], LOW);
+
+    
+    for(int i=0; i<CALIBRATION_MAX_NUM; i++)
+    {
+        SlopeCalculate_M_b(i);
+#if 1
+        cmd_port->print("runtimedata.SlopeFormula_M_b[");
+        cmd_port->print(i);
+        cmd_port->print("][0]= ");
+        cmd_port->println(runtimedata.SlopeFormula_M_b[0], 5);
+        cmd_port->print("runtimedata.SlopeFormula_M_b[");
+        cmd_port->print(i);
+        cmd_port->print("][1]= ");
+        cmd_port->println(runtimedata.SlopeFormula_M_b[1], 5);
+#endif
+    }
 }
 
 
@@ -720,5 +748,125 @@ bool MotorNormalProcess()
 	preBackBtnState = backbtn;
 
 	return result;
+}
+
+
+//此方法可執行，但記憶體不足
+#if 0
+void SlopeCalculate(int num)
+{
+    if(num == 0){
+        runtimedata.SlopeFormula[num][0] = 0.0;
+        runtimedata.SlopeFormula[num][1] = 0.0;
+    }
+    else if(num < CALIBRATION_MAX_NUM){
+        float x0 = (float)maindata.Std_Act_Distance[num-1][1] * 0.01;
+        float x1 = (float)maindata.Std_Act_Distance[num][1] * 0.01;
+        float y0 = (float)maindata.Std_Act_Distance[num-1][0] * 0.01;
+        float y1 = (float)maindata.Std_Act_Distance[num][0] * 0.01;
+        //M = (y1-y0)/(x1-x0)
+        float M = ((y1-y0)*(float)maindata.StepsForDepth*10.0)/(x1-x0);
+        //b = y - Mx
+        float b = (y1*(float)maindata.StepsForDepth*10.0) - (x1*M);
+        runtimedata.SlopeFormula[num][0] = M;
+        runtimedata.SlopeFormula[num][1] = b;
+    }
+    cmd_port->print("runtimedata.SlopeFormula[");
+    cmd_port->print(num);
+    cmd_port->print("][0]= ");
+    cmd_port->println(runtimedata.SlopeFormula[num][0], 5);
+    cmd_port->print("runtimedata.SlopeFormula[");
+    cmd_port->print(num);
+    cmd_port->print("][1]= ");
+    cmd_port->println(runtimedata.SlopeFormula[num][1], 5);
+    //y = Mx + b
+    //return M*y1 + b;
+}
+#endif
+
+
+long Calibration_PWM_Count(float dipth_mm)
+{
+    //y = Mx + b
+    if(dipth_mm != 0)
+    {
+        int num = (dipth_mm*2.0) - 1.0;
+        SlopeCalculate_M_b(num);
+//        if(!isnan(runtimedata.SlopeFormula[num][0]) && !isnan(runtimedata.SlopeFormula[num][1]))
+        if(!isnan(runtimedata.SlopeFormula_M_b[0]) && !isnan(runtimedata.SlopeFormula_M_b[1]))
+        {
+            if(num <= 1.0)
+            {
+                num = 1.0;
+                SlopeCalculate_M_b(num);
+//                cmd_port->println(runtimedata.SlopeFormula[num][0]*dipth_mm + runtimedata.SlopeFormula[num][1]);
+#if 0
+                cmd_port->println(runtimedata.SlopeFormula_M_b[0]*dipth_mm + runtimedata.SlopeFormula_M_b[1]);
+#endif
+                return runtimedata.SlopeFormula_M_b[0]*dipth_mm + runtimedata.SlopeFormula_M_b[1];
+            }
+            else if(num < CALIBRATION_MAX_NUM)
+            {
+                SlopeCalculate_M_b(num);
+//                cmd_port->println(runtimedata.SlopeFormula[num][0]*dipth_mm + runtimedata.SlopeFormula[num][1]);
+#if 0
+                cmd_port->println(runtimedata.SlopeFormula_M_b[0]*dipth_mm + runtimedata.SlopeFormula_M_b[1]);
+#endif
+                return runtimedata.SlopeFormula_M_b[0]*dipth_mm + runtimedata.SlopeFormula_M_b[1];
+            }
+        }
+        else
+        {
+            return dipth_mm * 10.0 * (float)maindata.StepsForDepth;
+        }
+    }
+    else{
+        return 0;
+    }
+}
+
+void SlopeCalculate_M_b(int num)
+{
+    if(num == 0){
+//        runtimedata.SlopeFormula[num][0] = 0.0;
+//        runtimedata.SlopeFormula[num][1] = 0.0;
+        runtimedata.SlopeFormula_M_b[0] = 0.0;
+        runtimedata.SlopeFormula_M_b[1] = 0.0;
+    }
+    else if(num < CALIBRATION_MAX_NUM){
+        float x0 = (float)maindata.Std_Act_Distance[num-1][1] * 0.001;
+        float x1 = (float)maindata.Std_Act_Distance[num][1] * 0.001;
+        float y0 = (float)maindata.Std_Act_Distance[num-1][0] * 0.001;
+        float y1 = (float)maindata.Std_Act_Distance[num][0] * 0.001;
+        //M = (y1-y0)/(x1-x0)
+        float M = ((y1-y0)*(float)maindata.StepsForDepth*10.0)/(x1-x0);
+        //b = y - Mx
+        float b = (y1*(float)maindata.StepsForDepth*10.0) - (x1*M);
+//        runtimedata.SlopeFormula[num][0] = M;
+//        runtimedata.SlopeFormula[num][1] = b;
+        runtimedata.SlopeFormula_M_b[0] = M;
+        runtimedata.SlopeFormula_M_b[1] = b;
+    }
+//    cmd_port->print("runtimedata.SlopeFormula[");
+//    cmd_port->print(num);
+//    cmd_port->print("][0]= ");
+//    cmd_port->println(runtimedata.SlopeFormula[num][0], 5);
+//    cmd_port->print("runtimedata.SlopeFormula[");
+//    cmd_port->print(num);
+//    cmd_port->print("][1]= ");
+//    cmd_port->println(runtimedata.SlopeFormula[num][1], 5);
+    
+#if 0
+    cmd_port->print("runtimedata.SlopeFormula_M_b[");
+    cmd_port->print(num);
+    cmd_port->print("][0]= ");
+    cmd_port->println(runtimedata.SlopeFormula_M_b[0], 5);
+    cmd_port->print("runtimedata.SlopeFormula_M_b[");
+    cmd_port->print(num);
+    cmd_port->print("][1]= ");
+    cmd_port->println(runtimedata.SlopeFormula_M_b[1], 5);
+#endif
+    //y = Mx + b
+    //return M*y1 + b;
 }
 

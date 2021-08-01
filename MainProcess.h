@@ -6,7 +6,7 @@
 
 //for LH Hardware debuger
 
-#define	VERSTR	"2021070801"
+#define	VERSTR	"2021080101"
 
 #define INO_DEBUG 				1
 #define HRM_DEBUG 				0
@@ -68,6 +68,7 @@ static const uint8_t ADC_PWMPin[] = {0, 0, 0, A8, 2, A9, 3, A10, 6, A11, 7, A12,
 #define MOTOR_DEGREE_MIN_NUM		0
 #define MOTOR_ZeroOffset            200
 
+#define CALIBRATION_MAX_NUM         100
 typedef struct _DigitalIO_
 {
 	uint8_t	Input[(INPUT_8_NUMBER+EXTIO_NUM)*8];
@@ -89,6 +90,8 @@ typedef struct _MainDataStruct_
     uint32_t	PressTimes;             //按壓多少次1次=0.1mm, 20次=2mm 
     uint32_t	MaxPressTimes;          //最大按壓次數
     float       CylinderLimitDistance;  //移動氣壓缸機構限制深度
+    uint16_t    Std_Act_Distance[CALIBRATION_MAX_NUM][2]; //2bytes * 200 = 400bytes
+    //Std_Act_Distance[][] = {Std distance(mm), Act distance(mm)}
 }MainDataStruct;
 
 typedef struct 
@@ -120,6 +123,8 @@ typedef struct _RuntimeStruct_
     bool    Cylinder_LeftLow_RightHigh;
     float   CmdMoveDepth;
     bool    needResetHMI = false;
+//    float   SlopeFormula[CALIBRATION_MAX_NUM][2] = {0}; //4byte * 200 = 800 bytes
+    float SlopeFormula_M_b[2];
 }RuntimeStatus;
 
 
@@ -137,5 +142,8 @@ bool MotorNormalProcess();
 bool MotorMoveToPrePosition();
 bool MotorBreakCylinderLimit();
 bool MotorCommandMove();
+void SlopeCalculate(int num);
+long Calibration_PWM_Count(float dipth_mm);
+void SlopeCalculate_M_b(int num);
 
 #endif	//_MAIN_PROCESS_H_
