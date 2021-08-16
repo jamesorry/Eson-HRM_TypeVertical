@@ -5,6 +5,7 @@
 #include "StepperMotor.h"
 #include "Timer.h"
 #include "HrmCommand.h"
+#include "EEPROM_Function.h"
 
 extern HardwareSerial *cmd_port;
 extern HardwareSerial *HRM_cmd_port;
@@ -28,6 +29,8 @@ HRMCMD HRM_g_cmdFunc[] = {
     {"white_card_zero_offset", white_card_zero_offset},
     {"white_card_limit_depth", white_card_limit_depth},
     {"white_card_max_depth", white_card_max_depth},
+    {"white_card_cal_show", white_card_cal_show},
+    {"white_card_cal_reset", white_card_cal_reset},
     {"white_card_cal", white_card_cal},
     {"?", HRMshowHelp}
 };
@@ -108,7 +111,8 @@ void white_card_speed()//Write:馬達速度
 }
 void white_card_save()//Write:儲存資料
 {
-    runtimedata.UpdateEEPROM = true;
+//    runtimedata.UpdateEEPROM = true;
+    WRITE_EEPROM();
     HRM_cmd_port->println("white_card_save");
 }
 void white_card_move_in()//Write:汽缸in:將白卡移動到中間Right
@@ -195,6 +199,8 @@ void white_card_limit_depth()
     float depth;
 	if(!HRMgetNextArg(arg1))
 	{
+        HRM_cmd_port->print("now white_card_limit_depth ");
+        HRM_cmd_port->println(maindata.CylinderLimitDistance, 1);
 		return;
 	}
     depth = arg1.toFloat();
@@ -213,6 +219,8 @@ void white_card_max_depth()
     float max_depth;
 	if(!HRMgetNextArg(arg1))
 	{
+        HRM_cmd_port->print("now white_card_max_depth: ");
+        HRM_cmd_port->println((float)maindata.MaxPressTimes/10.0, 1);
 		return;
 	}
     max_depth = arg1.toFloat();
@@ -222,6 +230,31 @@ void white_card_max_depth()
     HRM_cmd_port->println(max_depth, 1);
 }
 
+void white_card_cal_show()
+{
+    HRM_cmd_port->println("white_card_cal_show");
+    for(int i=0; i<CALIBRATION_MAX_NUM; i++){
+        HRM_cmd_port->print(i);
+        HRM_cmd_port->print(": ");
+        for(int j=0; j<2; j++){
+            HRM_cmd_port->print(maindata.Std_Act_Distance[i][j]*0.001, 2);
+            HRM_cmd_port->print(", ");
+        }
+        HRM_cmd_port->println();
+    }
+}
+void white_card_cal_reset()
+{
+    //初始化SlopeFormula內所有數值
+    maindata.Std_Act_Distance[0][0] = 100;
+    maindata.Std_Act_Distance[0][1] = 100;
+    for(int num=1; num<100; num++){
+        maindata.Std_Act_Distance[num][0] = (num)*500;
+        maindata.Std_Act_Distance[num][1] = (num)*500;
+    }
+    HRM_cmd_port->println("white_card_cal_reset");
+    //runtimedata.UpdateEEPROM = true;
+}
 void white_card_cal(void)
 {
     //white_card_cal 1 0.1 0.1
@@ -235,34 +268,34 @@ void white_card_cal(void)
     num = arg1.toInt();
     if(!HRMgetNextArg(arg2))
 	{
-	    cmd_port->print("maindata cal ");
-        cmd_port->print(num);
-        cmd_port->print(": ");
-        cmd_port->print(maindata.Std_Act_Distance[num][0]);
-        cmd_port->print(", ");
-        cmd_port->println(maindata.Std_Act_Distance[num][1]);
-
-	    cmd_port->print("cal ");
-        cmd_port->print(num);
-        cmd_port->print(": ");
-        cmd_port->print((float)maindata.Std_Act_Distance[num][0]*0.001, 3);
-        cmd_port->print(", ");
-        cmd_port->println((float)maindata.Std_Act_Distance[num][1]*0.001, 3);
+        HRM_cmd_port->println("please input Std_distance");
 		return;
 	}
     if(!HRMgetNextArg(arg3))
 	{
+        HRM_cmd_port->println("please input Act_distance");
 		return;
 	}
     Std_distance = arg2.toFloat();
     Act_distance = arg3.toFloat(); 
+#if 0
     cmd_port->print("Std_distance: ");
     cmd_port->println(Std_distance, 3);
     cmd_port->print("Act_distance: ");
     cmd_port->println(Act_distance, 3);
-    if(num >= 0 && num < 100){
+#endif
+    if(num >= 0 && num < CALIBRATION_MAX_NUM){
         maindata.Std_Act_Distance[num][0] = Std_distance*1000.0;
         maindata.Std_Act_Distance[num][1] = Act_distance*1000.0;
+        HRM_cmd_port->print("white_card_cal ");
+        HRM_cmd_port->print(num);
+        HRM_cmd_port->print(" ");
+        HRM_cmd_port->print(maindata.Std_Act_Distance[num][0]*0.001, 2);
+        HRM_cmd_port->print(" ");
+        HRM_cmd_port->println(maindata.Std_Act_Distance[num][1]*0.001, 2);
+    }
+    else{
+        HRM_cmd_port->println("white_card_cal num is over");
     }
 }
 

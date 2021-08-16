@@ -53,6 +53,8 @@ CMD g_cmdFunc[] = {
     {"PressTimes", cmdPressTimes},
     {"MaxPressTimes", cmdMaxPressTimes},
     {"CylinderLimitDistance", cmdCylinderLimitDistance},
+    {"ShowAllSlopeFormula", cmdShowAllSlopeFormula},
+    {"ResetSlopeFormula", cmdResetSlopeFormula},
     {"SlopeFormula",cmdSlopeFormula},
     {"cal_mm_pulse", cmdCalibration_PWM_Count},
 	{"?", showHelp}
@@ -848,6 +850,30 @@ void cmdCylinderLimitDistance()
     //cmd_port->println("New CylinderLimitDistance: " + String(maindata.CylinderLimitDistance));
     runtimedata.UpdateEEPROM = true;
 }
+void cmdShowAllSlopeFormula()
+{
+    for(int i=0; i<CALIBRATION_MAX_NUM; i++){
+        cmd_port->print(i);
+        cmd_port->print(": ");
+        for(int j=0; j<2; j++){
+            cmd_port->print(maindata.Std_Act_Distance[i][j]*0.001, 2);
+            cmd_port->print(", ");
+        }
+        cmd_port->println();
+    }
+}
+void cmdResetSlopeFormula()
+{
+    //初始化SlopeFormula內所有數值
+    maindata.Std_Act_Distance[0][0] = 100;
+    maindata.Std_Act_Distance[0][1] = 100;
+    for(int num=1; num<100; num++){
+        maindata.Std_Act_Distance[num][0] = (num)*500;
+        maindata.Std_Act_Distance[num][1] = (num)*500;
+    }
+    cmdShowAllSlopeFormula();
+    //runtimedata.UpdateEEPROM = true;
+}
 
 void cmdSlopeFormula()
 {
@@ -904,7 +930,6 @@ void cmdSlopeFormula()
 }
 void cmdCalibration_PWM_Count()
 {
-    
     String arg1;
     float dipth_mm;
     long pulse;
@@ -933,6 +958,7 @@ void cmdCalibration_PWM_Count()
         return;
     }
 }
+
 
 //-----------------------------------------------------------------------------------
 uint8_t UserCommWorkindex = 0;

@@ -341,6 +341,7 @@ bool MotorCommandMove()
     long targetposition;
 	char str[20];
 	char str_dis[6];
+    long cal_pulse;
     if(PreCmdWorkIndex != runtimedata.motorstate.CmdWorkIndex){
         PreCmdWorkIndex = runtimedata.motorstate.CmdWorkIndex;
         cmd_port->println("CmdWorkIndex: " + String(PreCmdWorkIndex));
@@ -357,7 +358,9 @@ bool MotorCommandMove()
             break;
         case 10:
             if(motor[0]->getState() == MOTOR_STATE_STOP){
-                targetposition =  maindata.MotorOffset + maindata.StepsForDepth*runtimedata.CmdMoveDepth*10;
+                cal_pulse = Calibration_PWM_Count(runtimedata.CmdMoveDepth);
+                targetposition = maindata.MotorOffset + cal_pulse;
+//                targetposition =  maindata.MotorOffset + maindata.StepsForDepth*runtimedata.CmdMoveDepth*10;
                 motor[0]->MoveTo(targetposition, maindata.MotorEESpeed);
                 Display(0, 0, 0, "Speed: " + String(maindata.MotorEESpeed));
                 dtostrf(runtimedata.CmdMoveDepth, 4, 1, str_dis);
@@ -367,7 +370,7 @@ bool MotorCommandMove()
             }
             break;
         case 20:
-            if(motor[0]->getState() == MOTOR_STATE_STOP && motor[0]->getPosition() == maindata.MotorOffset + maindata.StepsForDepth*runtimedata.CmdMoveDepth*10){
+            if(motor[0]->getState() == MOTOR_STATE_STOP && motor[0]->getPosition() == maindata.MotorOffset + Calibration_PWM_Count(runtimedata.CmdMoveDepth)){
                 runtimedata.motorstate.CmdWorkIndex += 10;
             }
             break;
@@ -387,6 +390,7 @@ bool MotorBreakCylinderLimit()
 	char str[20];
 	char str_dis[6];
     float distance;
+    long cal_pulse;
     if(PreCylLimitWorkIndex != runtimedata.motorstate.CylLimitWorkIndex){
         PreCylLimitWorkIndex = runtimedata.motorstate.CylLimitWorkIndex;
         cmd_port->println("CylLimitWorkIndex: " + String(PreCylLimitWorkIndex));
@@ -403,7 +407,9 @@ bool MotorBreakCylinderLimit()
             break;
         case 10: //馬達需要避免撞到機構，需要移動到設定高度
             if(motor[0]->getState() == MOTOR_STATE_STOP){
-                targetposition = maindata.MotorOffset + maindata.StepsForDepth*maindata.CylinderLimitDistance*10;
+                cal_pulse = Calibration_PWM_Count(maindata.CylinderLimitDistance);
+                targetposition = maindata.MotorOffset + cal_pulse;
+//                targetposition = maindata.MotorOffset + maindata.StepsForDepth*maindata.CylinderLimitDistance*10;
                 motor[0]->MoveTo(targetposition, maindata.MotorEESpeed);
                 dtostrf(maindata.CylinderLimitDistance, 4, 1, str_dis);
     			sprintf(str,"Go: %smm        ", str_dis);
@@ -432,7 +438,9 @@ bool MotorBreakCylinderLimit()
         case 25: //移動氣壓缸在右邊，確認已經到設定高度，馬達回到原始位置
             if(getInput(runtimedata.motorstate.CylinderRightSensorPin)){
                 if(motor[0]->getState() == MOTOR_STATE_STOP){
-                    targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
+                    cal_pulse = Calibration_PWM_Count((float)maindata.PressTimes * 0.1);
+                    targetposition = maindata.MotorOffset + cal_pulse;
+//                    targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
                     motor[0]->MoveTo(targetposition, maindata.MotorEESpeed);
                     distance = maindata.PressTimes/10.0;
                     dtostrf(distance, 4, 1, str_dis);
@@ -476,7 +484,11 @@ bool MotorMoveToPrePosition()
 	bool result = false;
 	float distance;
     long targetposition;
-    targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
+    long cal_pulse;
+//    targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
+    cal_pulse = Calibration_PWM_Count((float)maindata.PressTimes * 0.1);
+    targetposition = maindata.MotorOffset + cal_pulse;
+    
     if(PrePositionWorkindex != runtimedata.motorstate.PositionWorkIndex){
         PrePositionWorkindex = runtimedata.motorstate.PositionWorkIndex;
         cmd_port->println("PositionWorkIndex: " + String(PrePositionWorkindex));
@@ -581,7 +593,10 @@ bool MotorNormalProcess()
 	bool result = false;
 	long targetposition;
     float distance;
-    targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
+    long cal_pulse;
+    cal_pulse = Calibration_PWM_Count((float)maindata.PressTimes * 0.1);
+    targetposition = maindata.MotorOffset + cal_pulse;
+//    targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
     distance = maindata.PressTimes * (0.1);
     uint8_t addbtn = getInput(runtimedata.motorstate.MotorAddBtn);
 	uint8_t subbtn = getInput(runtimedata.motorstate.MotorSubBtn);
@@ -589,25 +604,31 @@ bool MotorNormalProcess()
 	uint8_t backbtn = getInput(runtimedata.motorstate.CylinderBackBtn);
     
 //馬達到最高點或是最低點，送出訊號告知PC
-    if(targetposition == maindata.MotorOffset)
+    if(targetposition <= maindata.MotorOffset)
     {    
+#if 0
         setOutput(5, 1);
         setOutput(6, 0);
         setOutput(7, 0);
+#endif
 //        cmd_port->println("motor in 最高點");
     }
-    else if(targetposition == maindata.MotorOffset + maindata.StepsForDepth * maindata.MaxPressTimes)
+    else if(targetposition == maindata.MotorOffset + Calibration_PWM_Count((float)maindata.MaxPressTimes * 0.1))
     {
+#if 0
         setOutput(7, 1);
         setOutput(5, 0);
         setOutput(6, 0);
+#endif
 //        cmd_port->println("motor in 最低點");
     }
     else
     {
+#if 0
         setOutput(6, 1);
         setOutput(5, 0);
         setOutput(7, 0);
+#endif
 //        cmd_port->println("motor in 中間值");
     }
     
@@ -625,7 +646,9 @@ bool MotorNormalProcess()
 #endif
             if(maindata.PressTimes < maindata.MaxPressTimes){
                 maindata.PressTimes++;
-                targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
+                cal_pulse = Calibration_PWM_Count((float)maindata.PressTimes * 0.1);
+                targetposition = maindata.MotorOffset + cal_pulse;
+//                targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
                 motor[0]->MoveTo(targetposition, maindata.MotorOPSpeed);
 #if MAIN_PROCESS_DEBUG
                 cmd_port->println("targetposition: " + String(targetposition));
@@ -649,7 +672,9 @@ bool MotorNormalProcess()
 #endif
             if(maindata.PressTimes > 0){
                 maindata.PressTimes--;
-                targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
+                cal_pulse = Calibration_PWM_Count((float)maindata.PressTimes * 0.1);
+                targetposition = maindata.MotorOffset + cal_pulse;
+//                targetposition = maindata.MotorOffset + maindata.StepsForDepth * maindata.PressTimes;
                 motor[0]->MoveTo(targetposition, maindata.MotorOPSpeed);
 #if MAIN_PROCESS_DEBUG
                 cmd_port->println("targetposition: " + String(targetposition));
@@ -787,19 +812,26 @@ void SlopeCalculate(int num)
 
 long Calibration_PWM_Count(float dipth_mm)
 {
+    long pulse = 0;
     //y = Mx + b
     if(dipth_mm != 0)
     {
-        int num = (dipth_mm*2.0) - 1.0;
-        SlopeCalculate_M_b(num);
-//        if(!isnan(runtimedata.SlopeFormula[num][0]) && !isnan(runtimedata.SlopeFormula[num][1]))
+//        int num = (dipth_mm*2.0) - 1.0;//round() :float四捨五入
+        int checknum = (dipth_mm * 2.0) * 10.0;  
+        int num = (dipth_mm * 2.0);
+        if((checknum)%10 != 0){
+            num+=1;
+        }
+        cmd_port->print("dipth_mm: ");
+        cmd_port->println(dipth_mm, 1);
+        cmd_port->println("num: " + String(num));
         if(!isnan(runtimedata.SlopeFormula_M_b[0]) && !isnan(runtimedata.SlopeFormula_M_b[1]))
         {
-            if(num <= 1.0)
+            //SlopeCalculate_M_b(num);
+            if(num <= 0.5)
             {
-                num = 1.0;
+                num = 0.5;
                 SlopeCalculate_M_b(num);
-//                cmd_port->println(runtimedata.SlopeFormula[num][0]*dipth_mm + runtimedata.SlopeFormula[num][1]);
 #if 0
                 cmd_port->println(runtimedata.SlopeFormula_M_b[0]*dipth_mm + runtimedata.SlopeFormula_M_b[1]);
 #endif
@@ -808,16 +840,18 @@ long Calibration_PWM_Count(float dipth_mm)
             else if(num < CALIBRATION_MAX_NUM)
             {
                 SlopeCalculate_M_b(num);
-//                cmd_port->println(runtimedata.SlopeFormula[num][0]*dipth_mm + runtimedata.SlopeFormula[num][1]);
 #if 0
                 cmd_port->println(runtimedata.SlopeFormula_M_b[0]*dipth_mm + runtimedata.SlopeFormula_M_b[1]);
 #endif
                 return runtimedata.SlopeFormula_M_b[0]*dipth_mm + runtimedata.SlopeFormula_M_b[1];
             }
-        }
-        else
-        {
-            return dipth_mm * 10.0 * (float)maindata.StepsForDepth;
+            else{
+                pulse = dipth_mm * 10 * maindata.StepsForDepth;
+#if 0
+                cmd_port->println("pulse: " + String(pulse));
+#endif
+                return pulse;
+            }
         }
     }
     else{
@@ -828,8 +862,6 @@ long Calibration_PWM_Count(float dipth_mm)
 void SlopeCalculate_M_b(int num)
 {
     if(num == 0){
-//        runtimedata.SlopeFormula[num][0] = 0.0;
-//        runtimedata.SlopeFormula[num][1] = 0.0;
         runtimedata.SlopeFormula_M_b[0] = 0.0;
         runtimedata.SlopeFormula_M_b[1] = 0.0;
     }
@@ -842,20 +874,9 @@ void SlopeCalculate_M_b(int num)
         float M = ((y1-y0)*(float)maindata.StepsForDepth*10.0)/(x1-x0);
         //b = y - Mx
         float b = (y1*(float)maindata.StepsForDepth*10.0) - (x1*M);
-//        runtimedata.SlopeFormula[num][0] = M;
-//        runtimedata.SlopeFormula[num][1] = b;
         runtimedata.SlopeFormula_M_b[0] = M;
         runtimedata.SlopeFormula_M_b[1] = b;
     }
-//    cmd_port->print("runtimedata.SlopeFormula[");
-//    cmd_port->print(num);
-//    cmd_port->print("][0]= ");
-//    cmd_port->println(runtimedata.SlopeFormula[num][0], 5);
-//    cmd_port->print("runtimedata.SlopeFormula[");
-//    cmd_port->print(num);
-//    cmd_port->print("][1]= ");
-//    cmd_port->println(runtimedata.SlopeFormula[num][1], 5);
-    
 #if 0
     cmd_port->print("runtimedata.SlopeFormula_M_b[");
     cmd_port->print(num);
